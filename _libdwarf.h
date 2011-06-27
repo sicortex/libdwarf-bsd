@@ -168,6 +168,8 @@ struct {								\
 	    (var) = TAILQ_NEXT((var), field))
 #endif
 
+=======
+>>>>>>> removed dependency from system libelf
 #ifndef	TAILQ_FOREACH_SAFE
 #define TAILQ_FOREACH_SAFE(var, head, field, tvar)                      \
 	for ((var) = TAILQ_FIRST((head));                               \
@@ -175,6 +177,7 @@ struct {								\
 	    (var) = (tvar))
 #endif
 
+<<<<<<< HEAD
 #ifndef TAILQ_INSERT_BEFORE
 #define	TAILQ_INSERT_BEFORE(listelm, elm, field) do {			\
 	QMD_TAILQ_CHECK_PREV(listelm, field);				\
@@ -247,6 +250,8 @@ struct {								\
 #define	ELFTC_HAVE_STRMODE	1
 #endif	/* __NetBSD __ */
 
+=======
+>>>>>>> removed dependency from system libelf
 
 #define DWARF_DIE_HASH_SIZE		8191
 
