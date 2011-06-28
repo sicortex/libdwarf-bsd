@@ -25,6 +25,7 @@
  */
 
 #include "_libdwarf.h"
+#include "roundup.h"
 
 void
 _dwarf_arange_cleanup(Dwarf_Debug dbg)

@@ -25,6 +25,7 @@
  */
 
 #include "_libdwarf.h"
+#include "roundup.h"
 
 static int
 _dwarf_frame_find_cie(Dwarf_FrameSec fs, Dwarf_Unsigned offset,
