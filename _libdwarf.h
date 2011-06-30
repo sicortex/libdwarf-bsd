@@ -67,6 +67,54 @@
 	    (var) = (tvar))
 #endif
 
+/**
+ ** Per-OS configuration.
+ **/
+
+#if defined(__linux__)
+
+#include <endian.h>
+
+#define	ELFTC_BYTE_ORDER			__BYTE_ORDER
+#define	ELFTC_BYTE_ORDER_LITTLE_ENDIAN		__LITTLE_ENDIAN
+#define	ELFTC_BYTE_ORDER_BIG_ENDIAN		__BIG_ENDIAN
+
+/*
+ * Debian GNU/Linux is missing strmode(3).
+ */
+#define	ELFTC_HAVE_STRMODE			0
+
+/* Whether we need to supply {be,le}32dec. */
+#define ELFTC_NEED_BYTEORDER_EXTENSIONS		1
+
+#define	roundup2	roundup
+
+#endif	/* __linux__ */
+
+
+#if defined(__FreeBSD__)
+
+#include <sys/endian.h>
+
+#define	ELFTC_BYTE_ORDER			_BYTE_ORDER
+#define	ELFTC_BYTE_ORDER_LITTLE_ENDIAN		_LITTLE_ENDIAN
+#define	ELFTC_BYTE_ORDER_BIG_ENDIAN		_BIG_ENDIAN
+
+#define	ELFTC_HAVE_STRMODE	1
+#endif	/* __FreeBSD__ */
+
+
+#if defined(__NetBSD__)
+
+#include <sys/endian.h>
+
+#define	ELFTC_BYTE_ORDER			_BYTE_ORDER
+#define	ELFTC_BYTE_ORDER_LITTLE_ENDIAN		_LITTLE_ENDIAN
+#define	ELFTC_BYTE_ORDER_BIG_ENDIAN		_BIG_ENDIAN
+
+#define	ELFTC_HAVE_STRMODE	1
+#endif	/* __NetBSD __ */
+
 
 #define DWARF_DIE_HASH_SIZE		8191
 
