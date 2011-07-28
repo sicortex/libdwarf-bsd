@@ -60,6 +60,13 @@ struct {								\
 }
 #endif
 
+#ifndef STAILQ_INIT
+#define STAILQ_INIT(head) do {                                          \
+        (head)->stqh_first = NULL;                                      \
+        (head)->stqh_last = &(head)->stqh_first;                        \
+} while (/*CONSTCOND*/0)
+#endif
+
 #ifndef STAILQ_NEXT
 #define	STAILQ_NEXT(elm, field)	((elm)->field.stqe_next)
 #endif
