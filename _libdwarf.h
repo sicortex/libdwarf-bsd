@@ -46,6 +46,40 @@
 #define	offsetof(T, M)		((int) &((T*) 0) -> M)
 #endif
 
+#ifndef STAILQ_HEAD
+#define	STAILQ_HEAD(name, type)						\
+struct name {								\
+	struct type *stqh_first;/* first element */			\
+	struct type **stqh_last;/* addr of last next element */		\
+}
+#endif
+
+#ifndef STAILQ_ENTRY
+#define	STAILQ_ENTRY(type)						\
+struct {								\
+	struct type *stqe_next;	/* next element */			\
+}
+#endif
+
+#ifndef STAILQ_NEXT
+#define	STAILQ_NEXT(elm, field)	((elm)->field.stqe_next)
+#endif
+
+#ifndef STAILQ_EMPTY
+#define	STAILQ_EMPTY(head)	((head)->stqh_first == NULL)
+#endif
+
+#ifndef STAILQ_FIRST
+#define	STAILQ_FIRST(head)	((head)->stqh_first)
+#endif
+
+#ifndef STAILQ_FOREACH
+#define	STAILQ_FOREACH(var, head, field)				\
+	for((var) = STAILQ_FIRST((head));				\
+	   (var);							\
+	   (var) = STAILQ_NEXT((var), field))
+#endif
+
 #ifndef	STAILQ_FOREACH_SAFE
 #define STAILQ_FOREACH_SAFE(var, head, field, tvar)            \
        for ((var) = STAILQ_FIRST((head));                      \
@@ -61,11 +95,101 @@
                 ((char *)((head)->stqh_last) - offsetof(struct type, field))))
 #endif
 
+#ifndef STAILQ_INSERT_TAIL
+#define	STAILQ_INSERT_TAIL(head, elm, field) do {			\
+	STAILQ_NEXT((elm), field) = NULL;				\
+	*(head)->stqh_last = (elm);					\
+	(head)->stqh_last = &STAILQ_NEXT((elm), field);			\
+} while (0)
+#endif
+
+#ifndef STAILQ_REMOVE
+#define	STAILQ_REMOVE_HEAD(head, field) do {				\
+	if ((STAILQ_FIRST((head)) =					\
+	     STAILQ_NEXT(STAILQ_FIRST((head)), field)) == NULL)		\
+		(head)->stqh_last = &STAILQ_FIRST((head));		\
+} while (0)
+#endif
+
+#ifndef STAILQ_REMOVE_AFTER
+#define STAILQ_REMOVE_AFTER(head, elm, field) do {			\
+	if ((STAILQ_NEXT(elm, field) =					\
+	     STAILQ_NEXT(STAILQ_NEXT(elm, field), field)) == NULL)	\
+		(head)->stqh_last = &STAILQ_NEXT((elm), field);		\
+} while (0)
+#endif
+
+#define	QMD_TRACE_ELEM(elem)
+#define	QMD_TRACE_HEAD(head)
+#define	QMD_SAVELINK(name, link)
+#define	TRACEBUF
+#define	TRASHIT(x)
+#define	QMD_TAILQ_CHECK_HEAD(head, field)
+#define	QMD_TAILQ_CHECK_TAIL(head, headname)
+#define	QMD_TAILQ_CHECK_NEXT(elm, field)
+#define	QMD_TAILQ_CHECK_PREV(elm, field)
+
+
+#ifndef STAILQ_REMOVE
+#define	STAILQ_REMOVE(head, elm, type, field) do {			\
+	QMD_SAVELINK(oldnext, (elm)->field.stqe_next);			\
+	if (STAILQ_FIRST((head)) == (elm)) {				\
+		STAILQ_REMOVE_HEAD((head), field);			\
+	}								\
+	else {								\
+		struct type *curelm = STAILQ_FIRST((head));		\
+		while (STAILQ_NEXT(curelm, field) != (elm))		\
+			curelm = STAILQ_NEXT(curelm, field);		\
+		STAILQ_REMOVE_AFTER(head, curelm, field);		\
+	}								\
+	TRASHIT(*oldnext);						\
+} while (0)
+#endif
+
+#ifndef TAILQ_FIRST
+#define	TAILQ_FIRST(head)	((head)->tqh_first)
+#endif
+
+#ifndef TAILQ_NEXT
+#define	TAILQ_NEXT(elm, field) ((elm)->field.tqe_next)
+#endif
+
+#ifndef TAILQ_FOREACH
+#define	TAILQ_FOREACH(var, head, field)					\
+	for ((var) = TAILQ_FIRST((head));				\
+	    (var);							\
+	    (var) = TAILQ_NEXT((var), field))
+#endif
+
 #ifndef	TAILQ_FOREACH_SAFE
 #define TAILQ_FOREACH_SAFE(var, head, field, tvar)                      \
 	for ((var) = TAILQ_FIRST((head));                               \
 	    (var) && ((tvar) = TAILQ_NEXT((var), field), 1);            \
 	    (var) = (tvar))
+#endif
+
+#ifndef TAILQ_INSERT_BEFORE
+#define	TAILQ_INSERT_BEFORE(listelm, elm, field) do {			\
+	QMD_TAILQ_CHECK_PREV(listelm, field);				\
+	(elm)->field.tqe_prev = (listelm)->field.tqe_prev;		\
+	TAILQ_NEXT((elm), field) = (listelm);				\
+	*(listelm)->field.tqe_prev = (elm);				\
+	(listelm)->field.tqe_prev = &TAILQ_NEXT((elm), field);		\
+	QMD_TRACE_ELEM(&(elm)->field);					\
+	QMD_TRACE_ELEM(&listelm->field);				\
+} while (0)
+#endif
+
+#ifndef TAILQ_INSERT_TAIL
+#define	TAILQ_INSERT_TAIL(head, elm, field) do {			\
+	QMD_TAILQ_CHECK_TAIL(head, field);				\
+	TAILQ_NEXT((elm), field) = NULL;				\
+	(elm)->field.tqe_prev = (head)->tqh_last;			\
+	*(head)->tqh_last = (elm);					\
+	(head)->tqh_last = &TAILQ_NEXT((elm), field);			\
+	QMD_TRACE_HEAD(head);						\
+	QMD_TRACE_ELEM(&(elm)->field);					\
+} while (0)
 #endif
 
 /**
