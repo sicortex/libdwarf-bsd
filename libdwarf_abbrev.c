@@ -222,7 +222,7 @@ int
 _dwarf_abbrev_gen(Dwarf_P_Debug dbg, Dwarf_Error *error)
 {
 	Dwarf_CU cu;
-	Dwarf_Abbrev ab, tab;
+	Dwarf_Abbrev ab;
 	Dwarf_AttrDef ad;
 	Dwarf_P_Section ds;
 	int ret;
@@ -236,7 +236,7 @@ _dwarf_abbrev_gen(Dwarf_P_Debug dbg, Dwarf_Error *error)
 	    DW_DLE_NONE)
 		return (ret);
 
-        HASH_ITER(ab_hh, cu->cu_abbrev_hash, ab, tab) {
+	for (ab = cu->cu_abbrev_hash; ab != NULL; ab = ab->ab_hh.next) {
 		RCHECK(WRITE_ULEB128(ab->ab_entry));
 		RCHECK(WRITE_ULEB128(ab->ab_tag));
 		RCHECK(WRITE_VALUE(ab->ab_children, 1));
