@@ -240,6 +240,25 @@ struct {								\
 #define	ELFTC_HAVE_STRMODE	1
 #endif	/* __NetBSD __ */
 
+
+#if defined(__sun)
+
+#include <sys/isa_defs.h>
+
+#define ELFTC_BYTE_ORDER_LITTLE_ENDIAN          1234
+#define ELFTC_BYTE_ORDER_BIG_ENDIAN             4321
+
+#if defined(_LITTLE_ENDIAN)
+#define ELFTC_BYTE_ORDER                        ELFTC_BYTE_ORDER_LITTLE_ENDIAN
+#elif defined(_BIG_ENDIAN)
+#define ELFTC_BYTE_ORDER                        ELFTC_BYTE_ORDER_BIG_ENDIAN
+#else
+#error "Can't detect byte order"
+#endif
+
+#endif // __sun
+
+
 /* #include "_elftc.h" */
 
 #ifndef	offsetof
