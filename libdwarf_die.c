@@ -450,3 +450,9 @@ _dwarf_die_pro_cleanup(Dwarf_P_Debug dbg)
 		}
 	}
 }
+
+/* Pathscale local. */
+int
+dwarf_die_linked(Dwarf_P_Die die) {
+  return die->die_left || die->die_right;
+}
