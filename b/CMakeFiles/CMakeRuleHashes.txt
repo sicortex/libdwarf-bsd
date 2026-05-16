@@ -1,0 +1,12 @@
+# Hashes of file build rules.
+b1fd5cc99567f45d34ddc0a862ea5e63 dwarf_funcs.c
+f7bfbbf9a5d0eb2c67d69b2886218b19 dwarf_pro_funcs.c
+d7fffe2974829278c405b0b734bb1976 dwarf_pro_pubnames.c
+8a0267204242508e4e74ef1fb0edaac4 dwarf_pro_types.c
+e07e1d9c9399e3a0ed243583e744eb28 dwarf_pro_vars.c
+2c6a13c88d38e11619a68d442f8141c0 dwarf_pro_weaks.c
+0858b617d08efa150c6856e0cf988eff dwarf_pubnames.c
+a472f291667c873275589f1abec3ea1b dwarf_pubtypes.c
+635133425bf199cb4c9e47fed83935a7 dwarf_types.c
+671ea6a9534f462366eb7cf1d8a2cf66 dwarf_vars.c
+c25cac82e238c02620e6e8e1efb43396 dwarf_weaks.c
