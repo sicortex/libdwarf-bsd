@@ -24,7 +24,7 @@
 .\"
 .\" $Id$
 .\"
-.Dd June 25, 2011
+.Dd July 6, 2011
 .Os
 .Dt DWARF_GET_LOCLIST_ENTRY 3
 .Sh NAME
@@ -64,13 +64,15 @@ section, to the start of the desired location list entry.
 .Pp
 Argument
 .Ar hipc
-should point to a location which will hold the highest program counter
-address covered by the location list entry found.
+should point to a location which will hold the offset, relative to the
+base address of the location list entry, of the highest program
+counter value for the entry.
 .Pp
 Argument
-.Ar hipc
-should point to a location which will hold the lowest program counter
-address covered by the location list entry found.
+.Ar lowpc
+should point to a location which will hold the offset, relative to the
+base address of the location list entry, of the lowest program counter
+value for the entry.
 .Pp
 Argument
 .Ar data
@@ -85,8 +87,9 @@ location list data returned in argument
 .Pp
 Argument
 .Ar next_entry
-should point to a location which will hold the offset of the next location
-list.
+should point to a location which will hold the offset of the next
+location list entry.
+.Pp
 If argument
 .Ar err
 is not NULL, it will be used to store error information in case

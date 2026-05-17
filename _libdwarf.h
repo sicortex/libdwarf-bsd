@@ -38,11 +38,46 @@
 #include <gelf.h>
 #include "dwarf.h"
 #include "libdwarf.h"
+#include "uthash.h"
 
 /* #include "_elftc.h" */
 
 #ifndef	offsetof
 #define	offsetof(T, M)		((int) &((T*) 0) -> M)
+#endif
+
+#ifndef STAILQ_HEAD
+#define	STAILQ_HEAD(name, type)						\
+struct name {								\
+	struct type *stqh_first;/* first element */			\
+	struct type **stqh_last;/* addr of last next element */		\
+}
+#endif
+
+#ifndef STAILQ_ENTRY
+#define	STAILQ_ENTRY(type)						\
+struct {								\
+	struct type *stqe_next;	/* next element */			\
+}
+#endif
+
+#ifndef STAILQ_NEXT
+#define	STAILQ_NEXT(elm, field)	((elm)->field.stqe_next)
+#endif
+
+#ifndef STAILQ_EMPTY
+#define	STAILQ_EMPTY(head)	((head)->stqh_first == NULL)
+#endif
+
+#ifndef STAILQ_FIRST
+#define	STAILQ_FIRST(head)	((head)->stqh_first)
+#endif
+
+#ifndef STAILQ_FOREACH
+#define	STAILQ_FOREACH(var, head, field)				\
+	for((var) = STAILQ_FIRST((head));				\
+	   (var);							\
+	   (var) = STAILQ_NEXT((var), field))
 #endif
 
 #ifndef	STAILQ_FOREACH_SAFE
@@ -60,11 +95,101 @@
                 ((char *)((head)->stqh_last) - offsetof(struct type, field))))
 #endif
 
+#ifndef STAILQ_INSERT_TAIL
+#define	STAILQ_INSERT_TAIL(head, elm, field) do {			\
+	STAILQ_NEXT((elm), field) = NULL;				\
+	*(head)->stqh_last = (elm);					\
+	(head)->stqh_last = &STAILQ_NEXT((elm), field);			\
+} while (0)
+#endif
+
+#ifndef STAILQ_REMOVE
+#define	STAILQ_REMOVE_HEAD(head, field) do {				\
+	if ((STAILQ_FIRST((head)) =					\
+	     STAILQ_NEXT(STAILQ_FIRST((head)), field)) == NULL)		\
+		(head)->stqh_last = &STAILQ_FIRST((head));		\
+} while (0)
+#endif
+
+#ifndef STAILQ_REMOVE_AFTER
+#define STAILQ_REMOVE_AFTER(head, elm, field) do {			\
+	if ((STAILQ_NEXT(elm, field) =					\
+	     STAILQ_NEXT(STAILQ_NEXT(elm, field), field)) == NULL)	\
+		(head)->stqh_last = &STAILQ_NEXT((elm), field);		\
+} while (0)
+#endif
+
+#define	QMD_TRACE_ELEM(elem)
+#define	QMD_TRACE_HEAD(head)
+#define	QMD_SAVELINK(name, link)
+#define	TRACEBUF
+#define	TRASHIT(x)
+#define	QMD_TAILQ_CHECK_HEAD(head, field)
+#define	QMD_TAILQ_CHECK_TAIL(head, headname)
+#define	QMD_TAILQ_CHECK_NEXT(elm, field)
+#define	QMD_TAILQ_CHECK_PREV(elm, field)
+
+
+#ifndef STAILQ_REMOVE
+#define	STAILQ_REMOVE(head, elm, type, field) do {			\
+	QMD_SAVELINK(oldnext, (elm)->field.stqe_next);			\
+	if (STAILQ_FIRST((head)) == (elm)) {				\
+		STAILQ_REMOVE_HEAD((head), field);			\
+	}								\
+	else {								\
+		struct type *curelm = STAILQ_FIRST((head));		\
+		while (STAILQ_NEXT(curelm, field) != (elm))		\
+			curelm = STAILQ_NEXT(curelm, field);		\
+		STAILQ_REMOVE_AFTER(head, curelm, field);		\
+	}								\
+	TRASHIT(*oldnext);						\
+} while (0)
+#endif
+
+#ifndef TAILQ_FIRST
+#define	TAILQ_FIRST(head)	((head)->tqh_first)
+#endif
+
+#ifndef TAILQ_NEXT
+#define	TAILQ_NEXT(elm, field) ((elm)->field.tqe_next)
+#endif
+
+#ifndef TAILQ_FOREACH
+#define	TAILQ_FOREACH(var, head, field)					\
+	for ((var) = TAILQ_FIRST((head));				\
+	    (var);							\
+	    (var) = TAILQ_NEXT((var), field))
+#endif
+
 #ifndef	TAILQ_FOREACH_SAFE
 #define TAILQ_FOREACH_SAFE(var, head, field, tvar)                      \
 	for ((var) = TAILQ_FIRST((head));                               \
 	    (var) && ((tvar) = TAILQ_NEXT((var), field), 1);            \
 	    (var) = (tvar))
+#endif
+
+#ifndef TAILQ_INSERT_BEFORE
+#define	TAILQ_INSERT_BEFORE(listelm, elm, field) do {			\
+	QMD_TAILQ_CHECK_PREV(listelm, field);				\
+	(elm)->field.tqe_prev = (listelm)->field.tqe_prev;		\
+	TAILQ_NEXT((elm), field) = (listelm);				\
+	*(listelm)->field.tqe_prev = (elm);				\
+	(listelm)->field.tqe_prev = &TAILQ_NEXT((elm), field);		\
+	QMD_TRACE_ELEM(&(elm)->field);					\
+	QMD_TRACE_ELEM(&listelm->field);				\
+} while (0)
+#endif
+
+#ifndef TAILQ_INSERT_TAIL
+#define	TAILQ_INSERT_TAIL(head, elm, field) do {			\
+	QMD_TAILQ_CHECK_TAIL(head, field);				\
+	TAILQ_NEXT((elm), field) = NULL;				\
+	(elm)->field.tqe_prev = (head)->tqh_last;			\
+	*(head)->tqh_last = (elm);					\
+	(head)->tqh_last = &TAILQ_NEXT((elm), field);			\
+	QMD_TRACE_HEAD(head);						\
+	QMD_TRACE_ELEM(&(elm)->field);					\
+} while (0)
 #endif
 
 /**
@@ -115,6 +240,231 @@
 #define	ELFTC_HAVE_STRMODE	1
 #endif	/* __NetBSD __ */
 
+
+#if defined(__sun)
+
+#include <sys/isa_defs.h>
+
+#define ELFTC_BYTE_ORDER_LITTLE_ENDIAN          1234
+#define ELFTC_BYTE_ORDER_BIG_ENDIAN             4321
+
+#if defined(_LITTLE_ENDIAN)
+#define ELFTC_BYTE_ORDER                        ELFTC_BYTE_ORDER_LITTLE_ENDIAN
+#elif defined(_BIG_ENDIAN)
+#define ELFTC_BYTE_ORDER                        ELFTC_BYTE_ORDER_BIG_ENDIAN
+#else
+#error "Can't detect byte order"
+#endif
+
+#endif // __sun
+
+
+/* #include "_elftc.h" */
+
+#ifndef	offsetof
+#define	offsetof(T, M)		((int) &((T*) 0) -> M)
+#endif
+
+#ifndef STAILQ_HEAD
+#define	STAILQ_HEAD(name, type)						\
+struct name {								\
+	struct type *stqh_first;/* first element */			\
+	struct type **stqh_last;/* addr of last next element */		\
+}
+#endif
+
+#ifndef STAILQ_ENTRY
+#define	STAILQ_ENTRY(type)						\
+struct {								\
+	struct type *stqe_next;	/* next element */			\
+}
+#endif
+
+#ifndef STAILQ_INIT
+#define STAILQ_INIT(head) do {                                          \
+        (head)->stqh_first = NULL;                                      \
+        (head)->stqh_last = &(head)->stqh_first;                        \
+} while (/*CONSTCOND*/0)
+#endif
+
+#ifndef STAILQ_NEXT
+#define	STAILQ_NEXT(elm, field)	((elm)->field.stqe_next)
+#endif
+
+#ifndef STAILQ_EMPTY
+#define	STAILQ_EMPTY(head)	((head)->stqh_first == NULL)
+#endif
+
+#ifndef STAILQ_FIRST
+#define	STAILQ_FIRST(head)	((head)->stqh_first)
+#endif
+
+#ifndef STAILQ_FOREACH
+#define	STAILQ_FOREACH(var, head, field)				\
+	for((var) = STAILQ_FIRST((head));				\
+	   (var);							\
+	   (var) = STAILQ_NEXT((var), field))
+#endif
+
+#ifndef	STAILQ_FOREACH_SAFE
+#define STAILQ_FOREACH_SAFE(var, head, field, tvar)            \
+       for ((var) = STAILQ_FIRST((head));                      \
+            (var) && ((tvar) = STAILQ_NEXT((var), field), 1);  \
+            (var) = (tvar))
+#endif
+
+#ifndef	STAILQ_LAST
+#define STAILQ_LAST(head, type, field)                                  \
+        (STAILQ_EMPTY((head)) ?                                         \
+                NULL :                                                  \
+                ((struct type *)(void *)                                \
+                ((char *)((head)->stqh_last) - offsetof(struct type, field))))
+#endif
+
+#ifndef STAILQ_INSERT_TAIL
+#define	STAILQ_INSERT_TAIL(head, elm, field) do {			\
+	STAILQ_NEXT((elm), field) = NULL;				\
+	*(head)->stqh_last = (elm);					\
+	(head)->stqh_last = &STAILQ_NEXT((elm), field);			\
+} while (0)
+#endif
+
+#ifndef STAILQ_REMOVE
+#define	STAILQ_REMOVE_HEAD(head, field) do {				\
+	if ((STAILQ_FIRST((head)) =					\
+	     STAILQ_NEXT(STAILQ_FIRST((head)), field)) == NULL)		\
+		(head)->stqh_last = &STAILQ_FIRST((head));		\
+} while (0)
+#endif
+
+#ifndef STAILQ_REMOVE_AFTER
+#define STAILQ_REMOVE_AFTER(head, elm, field) do {			\
+	if ((STAILQ_NEXT(elm, field) =					\
+	     STAILQ_NEXT(STAILQ_NEXT(elm, field), field)) == NULL)	\
+		(head)->stqh_last = &STAILQ_NEXT((elm), field);		\
+} while (0)
+#endif
+
+#define	QMD_TRACE_ELEM(elem)
+#define	QMD_TRACE_HEAD(head)
+#define	QMD_SAVELINK(name, link)
+#define	TRACEBUF
+#define	TRASHIT(x)
+#define	QMD_TAILQ_CHECK_HEAD(head, field)
+#define	QMD_TAILQ_CHECK_TAIL(head, headname)
+#define	QMD_TAILQ_CHECK_NEXT(elm, field)
+#define	QMD_TAILQ_CHECK_PREV(elm, field)
+
+
+#ifndef STAILQ_REMOVE
+#define	STAILQ_REMOVE(head, elm, type, field) do {			\
+	QMD_SAVELINK(oldnext, (elm)->field.stqe_next);			\
+	if (STAILQ_FIRST((head)) == (elm)) {				\
+		STAILQ_REMOVE_HEAD((head), field);			\
+	}								\
+	else {								\
+		struct type *curelm = STAILQ_FIRST((head));		\
+		while (STAILQ_NEXT(curelm, field) != (elm))		\
+			curelm = STAILQ_NEXT(curelm, field);		\
+		STAILQ_REMOVE_AFTER(head, curelm, field);		\
+	}								\
+	TRASHIT(*oldnext);						\
+} while (0)
+#endif
+
+#ifndef TAILQ_FIRST
+#define	TAILQ_FIRST(head)	((head)->tqh_first)
+#endif
+
+#ifndef TAILQ_NEXT
+#define	TAILQ_NEXT(elm, field) ((elm)->field.tqe_next)
+#endif
+
+#ifndef TAILQ_FOREACH
+#define	TAILQ_FOREACH(var, head, field)					\
+	for ((var) = TAILQ_FIRST((head));				\
+	    (var);							\
+	    (var) = TAILQ_NEXT((var), field))
+#endif
+
+#ifndef	TAILQ_FOREACH_SAFE
+#define TAILQ_FOREACH_SAFE(var, head, field, tvar)                      \
+	for ((var) = TAILQ_FIRST((head));                               \
+	    (var) && ((tvar) = TAILQ_NEXT((var), field), 1);            \
+	    (var) = (tvar))
+#endif
+
+#ifndef TAILQ_INSERT_BEFORE
+#define	TAILQ_INSERT_BEFORE(listelm, elm, field) do {			\
+	QMD_TAILQ_CHECK_PREV(listelm, field);				\
+	(elm)->field.tqe_prev = (listelm)->field.tqe_prev;		\
+	TAILQ_NEXT((elm), field) = (listelm);				\
+	*(listelm)->field.tqe_prev = (elm);				\
+	(listelm)->field.tqe_prev = &TAILQ_NEXT((elm), field);		\
+	QMD_TRACE_ELEM(&(elm)->field);					\
+	QMD_TRACE_ELEM(&listelm->field);				\
+} while (0)
+#endif
+
+#ifndef TAILQ_INSERT_TAIL
+#define	TAILQ_INSERT_TAIL(head, elm, field) do {			\
+	QMD_TAILQ_CHECK_TAIL(head, field);				\
+	TAILQ_NEXT((elm), field) = NULL;				\
+	(elm)->field.tqe_prev = (head)->tqh_last;			\
+	*(head)->tqh_last = (elm);					\
+	(head)->tqh_last = &TAILQ_NEXT((elm), field);			\
+	QMD_TRACE_HEAD(head);						\
+	QMD_TRACE_ELEM(&(elm)->field);					\
+} while (0)
+#endif
+
+/**
+ ** Per-OS configuration.
+ **/
+
+#if defined(__linux__)
+
+#include <endian.h>
+
+#define	ELFTC_BYTE_ORDER			__BYTE_ORDER
+#define	ELFTC_BYTE_ORDER_LITTLE_ENDIAN		__LITTLE_ENDIAN
+#define	ELFTC_BYTE_ORDER_BIG_ENDIAN		__BIG_ENDIAN
+
+/*
+ * Debian GNU/Linux is missing strmode(3).
+ */
+#define	ELFTC_HAVE_STRMODE			0
+
+/* Whether we need to supply {be,le}32dec. */
+#define ELFTC_NEED_BYTEORDER_EXTENSIONS		1
+
+#define	roundup2	roundup
+
+#endif	/* __linux__ */
+
+
+#if defined(__FreeBSD__)
+
+#include <sys/endian.h>
+
+#define	ELFTC_BYTE_ORDER			_BYTE_ORDER
+#define	ELFTC_BYTE_ORDER_LITTLE_ENDIAN		_LITTLE_ENDIAN
+#define	ELFTC_BYTE_ORDER_BIG_ENDIAN		_BIG_ENDIAN
+
+#define	ELFTC_HAVE_STRMODE	1
+#endif	/* __FreeBSD__ */
+
+
+#if defined(__NetBSD__)
+
+#include <sys/endian.h>
+
+#define	ELFTC_BYTE_ORDER			_BYTE_ORDER
+#define	ELFTC_BYTE_ORDER_LITTLE_ENDIAN		_LITTLE_ENDIAN
+#define	ELFTC_BYTE_ORDER_BIG_ENDIAN		_BIG_ENDIAN
+
+#define	ELFTC_HAVE_STRMODE	1
+#endif	/* __NetBSD __ */
 
 #define DWARF_DIE_HASH_SIZE		8191
 
@@ -197,8 +547,8 @@ struct _Dwarf_Abbrev {
 	uint64_t	ab_offset;	/* Offset in abbrev section. */
 	uint64_t	ab_length;	/* Length of this abbrev entry. */
 	uint64_t	ab_atnum;	/* Number of attribute defines. */
+	UT_hash_handle	ab_hh;		/* Uthash handle. */
 	STAILQ_HEAD(, _Dwarf_AttrDef) ab_attrdef; /* List of attribute defs. */
-	STAILQ_ENTRY(_Dwarf_Abbrev) ab_next; /* Next abbrev. */
 };
 
 struct _Dwarf_Die {
@@ -216,8 +566,6 @@ struct _Dwarf_Die {
 	char		*die_name;	/* Ptr to the name string. */
 	Dwarf_Attribute	*die_attrarray;	/* Array of attributes. */
 	STAILQ_HEAD(, _Dwarf_Attribute)	die_attr; /* List of attributes. */
-	STAILQ_ENTRY(_Dwarf_Die) die_next; /* Next die in list. */
-	STAILQ_ENTRY(_Dwarf_Die) die_hash; /* Next die in hash table. */
 	STAILQ_ENTRY(_Dwarf_Die) die_pro_next; /* Next die in pro-die list. */
 };
 
@@ -401,6 +749,8 @@ struct _Dwarf_CU {
 	uint16_t	cu_length_size; /* Size in bytes of the length field. */
 	uint16_t	cu_version;	/* DWARF version. */
 	uint64_t	cu_abbrev_offset; /* Offset into .debug_abbrev. */
+	uint64_t	cu_abbrev_offset_cur; /* Current abbrev offset. */
+	int		cu_abbrev_loaded; /* Abbrev table parsed. */
 	uint64_t	cu_abbrev_cnt;	/* Abbrev entry count. */
 	uint64_t	cu_lineno_offset; /* Offset into .debug_lineno. */
 	uint8_t		cu_pointer_size;/* Number of bytes in pointer. */
@@ -409,10 +759,7 @@ struct _Dwarf_CU {
 	uint64_t	cu_1st_offset;	/* First DIE offset. */
 	int		cu_pass2;	/* Two pass DIE traverse. */
 	Dwarf_LineInfo	cu_lineinfo;	/* Ptr to Dwarf_LineInfo. */
-	STAILQ_HEAD(, _Dwarf_Abbrev) cu_abbrev;	/* List of abbrevs. */
-	STAILQ_HEAD(, _Dwarf_Die) cu_die; /* List of dies. */
-	STAILQ_HEAD(, _Dwarf_Die) cu_die_hash[DWARF_DIE_HASH_SIZE];
-					/* Hash of dies. */
+	Dwarf_Abbrev	cu_abbrev_hash; /* Abbrev hash table. */
 	STAILQ_ENTRY(_Dwarf_CU) cu_next; /* Next compilation unit. */
 };
 
@@ -555,9 +902,11 @@ struct _Dwarf_Debug {
 int		_dwarf_abbrev_add(Dwarf_CU, uint64_t, uint64_t, uint8_t,
 		    uint64_t, Dwarf_Abbrev *, Dwarf_Error *);
 void		_dwarf_abbrev_cleanup(Dwarf_CU);
-int		_dwarf_abbrev_init(Dwarf_Debug, Dwarf_CU, Dwarf_Error *);
-Dwarf_Abbrev	_dwarf_abbrev_find(Dwarf_CU, uint64_t);
+int		_dwarf_abbrev_find(Dwarf_CU, uint64_t, Dwarf_Abbrev *,
+		    Dwarf_Error *);
 int		_dwarf_abbrev_gen(Dwarf_P_Debug, Dwarf_Error *);
+int		_dwarf_abbrev_parse(Dwarf_Debug, Dwarf_CU, Dwarf_Unsigned *,
+		    Dwarf_Abbrev *, Dwarf_Error *);
 int		_dwarf_add_AT_dataref(Dwarf_P_Debug, Dwarf_P_Die, Dwarf_Half,
 		    Dwarf_Unsigned, Dwarf_Unsigned, const char *,
 		    Dwarf_P_Attribute *, Dwarf_Error *);
@@ -583,7 +932,6 @@ int64_t		_dwarf_decode_sleb128(uint8_t **);
 uint64_t	_dwarf_decode_uleb128(uint8_t **);
 void		_dwarf_deinit(Dwarf_Debug);
 int		_dwarf_die_alloc(Dwarf_Debug, Dwarf_Die *, Dwarf_Error *);
-void		_dwarf_die_cleanup(Dwarf_Debug, Dwarf_CU);
 int		_dwarf_die_count_links(Dwarf_P_Die, Dwarf_P_Die,
 		    Dwarf_P_Die, Dwarf_P_Die);
 Dwarf_Die	_dwarf_die_find(Dwarf_Die, Dwarf_Unsigned);

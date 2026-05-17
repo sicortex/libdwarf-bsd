@@ -52,7 +52,6 @@ _dwarf_die_add(Dwarf_CU cu, uint64_t offset, uint64_t abnum, Dwarf_Abbrev ab,
 {
 	Dwarf_Debug dbg;
 	Dwarf_Die die;
-	uint64_t key;
 	int ret;
 
 	assert(cu != NULL);
@@ -69,12 +68,6 @@ _dwarf_die_add(Dwarf_CU cu, uint64_t offset, uint64_t abnum, Dwarf_Abbrev ab,
 	die->die_cu	= cu;
 	die->die_dbg	= cu->cu_dbg;
 
-	STAILQ_INSERT_TAIL(&cu->cu_die, die, die_next);
-
-	/* Add the die to the hash table in the compilation unit. */
-	key = offset % DWARF_DIE_HASH_SIZE;
-	STAILQ_INSERT_TAIL(&cu->cu_die_hash[key], die, die_hash);
-
 	if (diep != NULL)
 		*diep = die;
 
@@ -85,16 +78,22 @@ _dwarf_die_add(Dwarf_CU cu, uint64_t offset, uint64_t abnum, Dwarf_Abbrev ab,
 Dwarf_Die
 _dwarf_die_find(Dwarf_Die die, Dwarf_Unsigned off)
 {
+	Dwarf_Debug dbg;
 	Dwarf_CU cu;
 	Dwarf_Die die1;
+	Dwarf_Error de;
+	int ret;
 
 	cu = die->die_cu;
-	STAILQ_FOREACH(die1, &cu->cu_die, die_next) {
-		if (die1->die_offset == off)
-			return (die1);
-	}
+	dbg = die->die_dbg;
 
-	return (NULL);
+	ret = _dwarf_die_parse(dbg, dbg->dbg_info_sec, cu, cu->cu_dwarf_size,
+	    off, cu->cu_next_offset, &die1, 0, &de);
+
+	if (ret == DW_DLE_NONE)
+		return (die1);
+	else
+		return (NULL);
 }
 
 int
@@ -105,8 +104,6 @@ _dwarf_die_parse(Dwarf_Debug dbg, Dwarf_Section *ds, Dwarf_CU cu,
 	Dwarf_Abbrev ab;
 	Dwarf_AttrDef ad;
 	Dwarf_Die die;
-	Dwarf_Die parent;
-	Dwarf_Die left;
 	uint64_t abnum;
 	uint64_t die_offset;
 	int ret, level;
@@ -115,8 +112,6 @@ _dwarf_die_parse(Dwarf_Debug dbg, Dwarf_Section *ds, Dwarf_CU cu,
 
 	level = 1;
 	die = NULL;
-	parent = NULL;
-	left = NULL;
 
 	while (offset < next_offset && offset < ds->ds_size) {
 
@@ -131,17 +126,13 @@ _dwarf_die_parse(Dwarf_Debug dbg, Dwarf_Section *ds, Dwarf_CU cu,
 			/*
 			 * Return to previous DIE level.
 			 */
-			left = parent;
-			if (parent != NULL)
-				parent = parent->die_parent;
 			level--;
 			continue;
 		}
 
-		if ((ab = _dwarf_abbrev_find(cu, abnum)) == NULL) {
-			DWARF_SET_ERROR(dbg, error, DW_DLE_DEBUG_ABBREV_NULL);
-			return (DW_DLE_DEBUG_ABBREV_NULL);
-		}
+		if ((ret = _dwarf_abbrev_find(cu, abnum, &ab, error)) !=
+		    DW_DLE_NONE)
+			return (ret);
 
 		if ((ret = _dwarf_die_add(cu, die_offset, abnum, ab, &die,
 		    error)) != DW_DLE_NONE)
@@ -154,21 +145,11 @@ _dwarf_die_parse(Dwarf_Debug dbg, Dwarf_Section *ds, Dwarf_CU cu,
 				return (ret);
 		}
 
-		die->die_parent = parent;
-		die->die_left = left;
-
-		if (left)
-			left->die_right = die;
-		else if (parent)
-			parent->die_child = die; /* First child. */
-
 		die->die_next_off = offset;
 		if (search_sibling && level > 0) {
-			left = die;
+			dwarf_dealloc(dbg, die, DW_DLA_DIE);
 			if (ab->ab_children == DW_CHILDREN_yes) {
 				/* Advance to next DIE level. */
-				parent = die;
-				left = NULL;
 				level++;
 			}
 		} else {
@@ -178,30 +159,6 @@ _dwarf_die_parse(Dwarf_Debug dbg, Dwarf_Section *ds, Dwarf_CU cu,
 	}
 
 	return (DW_DLE_NO_ENTRY);
-}
-
-void
-_dwarf_die_cleanup(Dwarf_Debug dbg, Dwarf_CU cu)
-{
-	Dwarf_Die die, tdie;
-	Dwarf_Attribute at, tat;
-
-	assert(dbg != NULL && dbg->dbg_mode == DW_DLC_READ);
-	assert(cu != NULL);
-
-	STAILQ_FOREACH_SAFE(die, &cu->cu_die, die_next, tdie) {
-		STAILQ_REMOVE(&cu->cu_die, die, _Dwarf_Die, die_next);
-		STAILQ_FOREACH_SAFE(at, &die->die_attr, at_next, tat) {
-			STAILQ_REMOVE(&die->die_attr, at,
-			    _Dwarf_Attribute, at_next);
-			if (at->at_ld != NULL)
-				free(at->at_ld);
-			free(at);
-		}
-		if (die->die_attrarray)
-			free(die->die_attrarray);
-		free(die);
-	}
 }
 
 void
@@ -343,7 +300,7 @@ _dwarf_die_gen_recursive(Dwarf_P_Debug dbg, Dwarf_CU cu, Dwarf_Rel_Section drs,
 	 * Search abbrev list to find a matching entry.
 	 */
 	die->die_ab = NULL;
-	STAILQ_FOREACH(ab, &cu->cu_abbrev, ab_next) {
+	for (ab = cu->cu_abbrev_hash; ab != NULL; ab = ab->ab_hh.next) {
 		if (die->die_tag != ab->ab_tag)
 			continue;
 		if (ab->ab_children == DW_CHILDREN_no && die->die_child != NULL)
@@ -464,13 +421,13 @@ _dwarf_die_gen(Dwarf_P_Debug dbg, Dwarf_CU cu, Dwarf_Rel_Section drs,
 
 gen_fail:
 
-	STAILQ_FOREACH_SAFE(ab, &cu->cu_abbrev, ab_next, tab) {
+	HASH_ITER(ab_hh, cu->cu_abbrev_hash, ab, tab) {
+		HASH_DELETE(ab_hh, cu->cu_abbrev_hash, ab);
 		STAILQ_FOREACH_SAFE(ad, &ab->ab_attrdef, ad_next, tad) {
 			STAILQ_REMOVE(&ab->ab_attrdef, ad, _Dwarf_AttrDef,
 			    ad_next);
 			free(ad);
 		}
-		STAILQ_REMOVE(&cu->cu_abbrev, ab, _Dwarf_Abbrev, ab_next);
 		free(ab);
 	}
 
@@ -485,11 +442,17 @@ _dwarf_die_pro_cleanup(Dwarf_P_Debug dbg)
 
 	assert(dbg != NULL && dbg->dbg_mode == DW_DLC_WRITE);
 
-	STAILQ_FOREACH_SAFE(die, &dbg->dbgp_dielist, die_next, tdie) {
+	STAILQ_FOREACH_SAFE(die, &dbg->dbgp_dielist, die_pro_next, tdie) {
 		STAILQ_FOREACH_SAFE(at, &die->die_attr, at_next, tat) {
 			STAILQ_REMOVE(&die->die_attr, at, _Dwarf_Attribute,
 			    at_next);
 			free(at);
 		}
 	}
+}
+
+/* Pathscale local. */
+int
+dwarf_die_linked(Dwarf_P_Die die) {
+  return die->die_left || die->die_right;
 }

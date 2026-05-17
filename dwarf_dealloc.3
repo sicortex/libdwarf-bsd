@@ -23,7 +23,7 @@
 .\"
 .\" $Id$
 .\"
-.Dd May 21, 2011
+.Dd July 23, 2011
 .Os
 .Dt DWARF_DEALLOC 3
 .Sh NAME
@@ -134,10 +134,23 @@ Valid values for the
 .Ar type
 argument are:
 .Bl -tag -width ".Dv DW_DLA_FRAME_BLOCK"
+.It Dv DW_DLA_ABBREV
+An object of type
+.Vt Dwarf_Abbrev ,
+as returned by a call to the function
+.Xr dwarf_get_abbrev 3 .
+.It Dv DW_DLA_DIE
+An object of type
+.Vt Dwarf_Die ,
+as returned by calls to the functions
+.Xr dwarf_child 3 ,
+.Xr dwarf_offdie 3
+or
+.Xr dwarf_siblingof 3 .
 .It Dv DW_DLA_FRAME_BLOCK
 An array of objects of type
 .Vt Dwarf_Frame_op ,
-returned by calls to
+as returned by a call to the function
 .Xr dwarf_expand_frame_instructions 3 .
 .El
 .Pp
@@ -182,5 +195,9 @@ and
 .Fn dwarf_weaks_dealloc
 have no return value.
 .Sh SEE ALSO
-.Xr dwarf 3
-.Xr dwarf_expand_frame_instructions 3
+.Xr dwarf 3 ,
+.Xr dwarf_child 3 ,
+.Xr dwarf_expand_frame_instructions 3 ,
+.Xr dwarf_get_abbrev 3 ,
+.Xr dwarf_offdie 3 ,
+.Xr dwarf_siblingof 3
